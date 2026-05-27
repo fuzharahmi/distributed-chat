@@ -234,17 +234,19 @@
   //  SERVER STATUS UPDATE
   // ============================================================
   function updateServerStatus(status, text) {
+    // Update status dot di halaman LOGIN (index.html)
     const statusEl = document.getElementById('serverStatus');
-    if (!statusEl) return;
+    if (statusEl) {
+      statusEl.className = 'server-status ' + status;
+      const textEl = statusEl.querySelector('.status-text');
+      if (textEl) textEl.textContent = text;
+    }
 
-    statusEl.className = 'server-status ' + status;
-    const textEl = statusEl.querySelector('.status-text');
-    if (textEl) textEl.textContent = text;
-
-    // Update server info di chat page
+    // Update info server di sidebar halaman CHAT (chat.html)
+    // Ini terpisah dari statusEl agar tidak terkena early return
     const serverInfo = document.getElementById('serverInfo');
     if (serverInfo) {
-      serverInfo.textContent = status === 'connected' ? 'Terhubung' : text;
+      serverInfo.textContent = status === 'connected' ? '✅ Terhubung' : text;
     }
   }
 
