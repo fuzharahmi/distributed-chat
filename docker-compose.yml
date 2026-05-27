@@ -1,0 +1,76 @@
+# ============================================================
+#  DOCKER COMPOSE - Distributed Chat System
+#
+#  Menjalankan 3 service:
+#  1. redis         -> Message broker (Redis Pub/Sub)
+#  2. chat-server-1 -> Chat server pertama (port 3000)
+#  3. chat-server-2 -> Chat server kedua (port 3001)
+#
+#  Cara menjalankan:
+#    docker-compose up --build
+#
+#  Cara menghentikan:
+#    docker-compose down
+# ============================================================
+
+version: '3.8'
+
+services:
+  # ========================================
+  # REDIS - Message Broker / Pub-Sub
+  # ========================================
+  redis:
+    image: redis:alpine
+    container_name: distributed-chat-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # CHAT SERVER 1 - Port 3000
+  # ========================================
+  chat-server-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: distributed-chat-server-1
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+      - SERVER_ID=server-1
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ========================================
+  # CHAT SERVER 2 - Port 3001
+  # ========================================
+  chat-server-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: distributed-chat-server-2
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - REDIS_URL=redis://redis:6379
+      - SERVER_ID=server-2
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+    driver: local
