@@ -41,16 +41,31 @@ const AVAILABLE_ROOMS = [
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io dengan konfigurasi CORS agar bisa diakses dari mana saja
+// Penting untuk Railway/cloud proxy: agar IP address terdeteksi dengan benar
+app.set('trust proxy', 1);
+
+// Socket.io dengan konfigurasi khusus untuk Railway cloud proxy
+// - transports: dukung polling DAN websocket (Railway butuh polling sebagai fallback)
+// - pingTimeout/pingInterval: lebih longgar agar koneksi tidak putus di cloud
+// - allowEIO3: true agar kompatibel dengan berbagai client
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+    credentials: false
+  },
+  transports: ['polling', 'websocket'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS']
+}));
 app.use(express.json());
 
 // Serve static files dari folder client
@@ -67,9 +82,24 @@ app.use(express.static(path.join(__dirname, '..', 'client')));
 //  Catatan: Redis subscriber tidak bisa digunakan untuk
 //  operasi data biasa, makanya butuh koneksi terpisah.
 // ============================================================
-const redisPub = new Redis(REDIS_URL);
-const redisSub = new Redis(REDIS_URL);
-const redisStore = new Redis(REDIS_URL);
+// Konfigurasi ioredis yang aman untuk cloud deployment:
+// - maxRetriesPerRequest: null  -> jangan crash saat retry, biarkan reconnect terus
+// - enableReadyCheck: false     -> jangan tunggu READY signal, langsung connect
+// - retryStrategy: exponential backoff agar tidak spam retry terlalu cepat
+const redisOptions = {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+  retryStrategy(times) {
+    // Tunggu paling lama 5 detik antar retry
+    const delay = Math.min(times * 200, 5000);
+    console.log(`[${SERVER_ID}] 🔄 Redis retry #${times} dalam ${delay}ms`);
+    return delay;
+  }
+};
+
+const redisPub = new Redis(REDIS_URL, redisOptions);
+const redisSub = new Redis(REDIS_URL, redisOptions);
+const redisStore = new Redis(REDIS_URL, redisOptions);
 
 // Log koneksi Redis
 redisPub.on('connect', () => {

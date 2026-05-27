@@ -137,10 +137,14 @@
    */
   function initSocket() {
     // Connect ke server yang sama (auto-detect URL)
+    // Penting untuk Railway: mulai dengan 'polling' agar handshake berhasil
+    // melewati proxy cloud, lalu upgrade ke 'websocket' secara otomatis
     socket = io({
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      timeout: 20000
     });
 
     // Event: Berhasil terhubung
