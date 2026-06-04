@@ -1,7 +1,7 @@
 # ============================================================
 #  DOCKER COMPOSE - Distributed Chat System
 #
-#  Menjalankan 3 service:
+#  Menjalankan 3 service sekaligus:
 #  1. redis         -> Message broker (Redis Pub/Sub)
 #  2. chat-server-1 -> Chat server pertama (port 3000)
 #  3. chat-server-2 -> Chat server kedua (port 3001)
@@ -15,6 +15,10 @@
 
 version: '3.8'
 
+networks:
+  chat-network:
+    driver: bridge
+
 services:
   # ========================================
   # REDIS - Message Broker / Pub-Sub
@@ -27,11 +31,8 @@ services:
     volumes:
       - redis-data:/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    networks:
+      - chat-network
 
   # ========================================
   # CHAT SERVER 1 - Port 3000
@@ -48,9 +49,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - SERVER_ID=server-1
     depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+      - redis
+    restart: on-failure
+    networks:
+      - chat-network
 
   # ========================================
   # CHAT SERVER 2 - Port 3001
@@ -67,9 +69,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - SERVER_ID=server-2
     depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+      - redis
+    restart: on-failure
+    networks:
+      - chat-network
 
 volumes:
   redis-data:
